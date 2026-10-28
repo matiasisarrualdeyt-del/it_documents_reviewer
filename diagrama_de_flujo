@@ -1,0 +1,50 @@
+[ START ]
+   │
+   ▼
+[ AgentState ] ──► Inicializa estado con: question: str, documents: List[Document], generation: str, context_grade: str, loop_step: int
+   │
+   ▼
+┌────────────────────────────────────────────────────────┐
+│ [NODO 1] retrieve_node                                 │
+│ • Entrada: state["question"]                           │
+│ • Ejecución: vector_store_service.                     │
+│   similarity_search_with_score(question, k=3)          │
+│ • Salida: state["documents"] = [doc1, doc2, doc3]      │
+└────────────────────────────────────────────────────────┘
+   │
+   ▼
+┌────────────────────────────────────────────────────────┐
+│ [NODO 2] grade_context_node                            │
+│ • Entrada: state["question"], state["documents"]       │
+│ • Verificación: Si no hay documentos ──► "rewrite"     │
+│ • Ejecución: Prompt evaluador estricto con LLM         │
+│   (gemini-3.1-flash-lite, temperature=0.1)             │
+│ • Salida: state["context_grade"] = "generate" | "rewrite"│
+└────────────────────────────────────────────────────────┘
+   │
+   ▼
+┌────────────────────────────────────────────────────────┐
+│ [CONDICIÓN] route_after_grading                        │
+│ • Lee: state.get("context_grade")                      │
+└────────────────────────────────────────────────────────┘
+   ├── [Si "rewrite"] ──► ┌────────────────────────────────────────────────────────┐
+   │                      │ [NODO 3] rewrite_node                                  │
+   │                      │ • Entrada: state["question"], state["loop_step"]       │
+   │                      │ • Ejecución: Prompt de reformulación técnica con LLM   │
+   │                      │ • Salida: Nueva question mejorada y loop_step + 1      │
+   │                      └────────────────────────────────────────────────────────┘
+   │                                                 │
+   │◄────────────────────────────────────────────────┘
+   │   (Vuelve a [NODO 1] con la consulta optimizada)
+   │
+   └── [Si "generate"] ─► ┌────────────────────────────────────────────────────────┐
+                          │ [NODO 4] generate_node                                 │
+                          │ • Entrada: state["question"], state["documents"]       │
+                          │ • Ejecución: Formatea contexto con metadatos           │
+                          │   ([doc_id] | source), aplica prompt obligatorio       │
+                          │   de citación y sanitiza respuesta cruda del LLM       │
+                          │ • Salida: state["generation"] = texto final redactado  │
+                          └────────────────────────────────────────────────────────┘
+                                                     │
+                                                     ▼
+                                                 [ END ]
